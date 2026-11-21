@@ -55,6 +55,7 @@ $BIN eta sunferry "mui wo" --json
 
 $BIN timetable hkkf 1 --direction outbound
 $BIN timetable sunferry CECC --json
+$BIN update --check
 ```
 
 Routes can be selected by operator id (`2`), Sun Ferry code (`CECC`), timetable

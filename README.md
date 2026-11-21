@@ -46,6 +46,7 @@ hkferry eta sunferry CECC --json
 hkferry timetable hkkf 1 --direction outbound
 hkferry timetable sunferry CECC
 hkferry mcp
+hkferry update --check
 ```
 
 ## Routes
