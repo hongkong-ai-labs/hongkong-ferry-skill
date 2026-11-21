@@ -9,6 +9,8 @@ use clap::{Parser, Subcommand};
 
 use api::{Client, Operator};
 
+mod update;
+
 #[derive(Parser)]
 #[command(
     name = "hkferry",
@@ -54,6 +56,15 @@ enum Command {
         /// outbound or inbound (HKKF only; default outbound)
         #[arg(long, short)]
         direction: Option<String>,
+    },
+    /// Update this binary using the method it was installed with
+    Update {
+        /// Only report the current version, latest release and install method
+        #[arg(long)]
+        check: bool,
+        /// Reinstall even when the current version is up to date
+        #[arg(long)]
+        force: bool,
     },
     /// Run the MCP server over stdio
     Mcp,
@@ -138,6 +149,9 @@ async fn main() -> Result<()> {
             } else {
                 println!("{}", render::timetable(&report));
             }
+        }
+        Command::Update { check, force } => {
+            update::run(check, force)?;
         }
         Command::Mcp => unreachable!(),
     }
