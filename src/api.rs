@@ -338,9 +338,7 @@ impl Client {
                         eta: sailing.eta.unwrap_or_default(),
                         eta_at: None,
                         direction: None,
-                        vessel: sailing
-                            .vesselcode
-                            .filter(|code| !code.trim().is_empty()),
+                        vessel: sailing.vesselcode.filter(|code| !code.trim().is_empty()),
                         remark: sailing.rmk_en.filter(|remark| !remark.trim().is_empty()),
                     })
                     .collect();
@@ -367,9 +365,7 @@ impl Client {
             Operator::Hkkf => {
                 let direction = direction.unwrap_or("outbound");
                 let url = format!("{HKKF_BASE}/time_table/{}/{direction}", route.id);
-                let body = self
-                    .text(&url, Duration::from_secs(6 * 3600))
-                    .await?;
+                let body = self.text(&url, Duration::from_secs(6 * 3600)).await?;
                 let rows = parse_hkkf_timetable(&body)?;
                 Ok(TimetableReport {
                     operator: "hkkf".to_string(),
@@ -381,14 +377,11 @@ impl Client {
                 })
             }
             Operator::SunFerry => {
-                let slug = route
-                    .slug
-                    .as_deref()
-                    .ok_or_else(|| anyhow::anyhow!("Sun Ferry route {} has no timetable slug", route.id))?;
+                let slug = route.slug.as_deref().ok_or_else(|| {
+                    anyhow::anyhow!("Sun Ferry route {} has no timetable slug", route.id)
+                })?;
                 let url = format!("{SUN_BASE}/timetable/SunFerry_{slug}_timetable_eng.csv");
-                let body = self
-                    .text(&url, Duration::from_secs(6 * 3600))
-                    .await?;
+                let body = self.text(&url, Duration::from_secs(6 * 3600)).await?;
                 let rows = parse_sun_timetable(&body)?;
                 Ok(TimetableReport {
                     operator: "sunferry".to_string(),
@@ -507,10 +500,7 @@ pub fn normalize_time(raw: &str) -> Option<String> {
             } else {
                 parsed.hour()
             };
-            return Some(format!(
-                "{hour:02}:{:02}",
-                parsed.minute()
-            ));
+            return Some(format!("{hour:02}:{:02}", parsed.minute()));
         }
     }
     let parsed = NaiveTime::parse_from_str(cleaned.trim(), "%H:%M").ok()?;

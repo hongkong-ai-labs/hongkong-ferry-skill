@@ -1,0 +1,13 @@
+services:
+  stdio:
+    build: .
+    image: hkferry:local
+    stdin_open: true
+    entrypoint: ["hkferry"]
+    command: ["mcp"]
+
+  cli:
+    profiles: ["cli"]
+    build: .
+    image: hkferry:local
+    command: ["--help"]
