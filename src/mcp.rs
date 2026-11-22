@@ -138,9 +138,7 @@ async fn call(client: &Client, id: Option<Value>, params: Option<&Value>) -> Val
                     .and_then(Value::as_str)
                     .unwrap_or("all");
                 let routes = if operator.eq_ignore_ascii_case("all") {
-                    let mut routes = client.routes(Operator::Hkkf).await?;
-                    routes.extend(client.routes(Operator::SunFerry).await?);
-                    routes
+                    client.all_routes().await?
                 } else {
                     client.routes(Operator::parse(operator)?).await?
                 };
