@@ -3,6 +3,7 @@
 mod api;
 mod mcp;
 mod render;
+mod sources;
 
 use anyhow::{Result, bail};
 use clap::{Parser, Subcommand};
@@ -82,9 +83,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Command::Routes { operator } => {
             let routes = if operator.eq_ignore_ascii_case("all") {
-                let mut routes = client.routes(Operator::Hkkf).await?;
-                routes.extend(client.routes(Operator::SunFerry).await?);
-                routes
+                client.all_routes().await?
             } else {
                 client.routes(Operator::parse(&operator)?).await?
             };
