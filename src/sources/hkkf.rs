@@ -28,21 +28,21 @@ struct HkkfRoute {
 }
 
 #[derive(Debug, Deserialize)]
-struct HkkfEta {
+pub(crate) struct HkkfEta {
     #[serde(default)]
-    generated_timestamp: String,
+    pub(crate) generated_timestamp: String,
     #[serde(default)]
-    data: Vec<HkkfSailing>,
+    pub(crate) data: Vec<HkkfSailing>,
 }
 
 #[derive(Debug, Deserialize)]
-struct HkkfSailing {
+pub(crate) struct HkkfSailing {
     #[serde(default)]
-    direction: String,
+    pub(crate) direction: String,
     #[serde(default)]
-    session_time: String,
+    pub(crate) session_time: String,
     #[serde(default, rename = "ETA")]
-    eta: String,
+    pub(crate) eta: String,
 }
 
 pub async fn routes(client: &Client) -> Result<Vec<Route>> {
@@ -98,6 +98,11 @@ pub async fn eta(client: &Client, route: &Route, direction: Option<&str>) -> Res
     })
 }
 
+#[cfg(test)]
+pub(crate) fn parse_hkkf_timetable(body: &str) -> Result<Vec<TimetableRow>> {
+    parse_timetable(body)
+}
+
 pub async fn timetable(
     client: &Client,
     route: &Route,
@@ -119,7 +124,7 @@ pub async fn timetable(
     })
 }
 
-fn parse_timetable(body: &str) -> Result<Vec<TimetableRow>> {
+pub(crate) fn parse_timetable(body: &str) -> Result<Vec<TimetableRow>> {
     let body = body.trim_start_matches('\u{feff}');
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)

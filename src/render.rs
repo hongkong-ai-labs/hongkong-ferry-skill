@@ -125,3 +125,101 @@ pub fn timetable(report: &TimetableReport) -> String {
     out.push_str(&table(&["SERVICE DAY", "TIME", "MARK", "REMARK"], &rows));
     out.trim_end().to_string()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::api::{Sailing, TimetableRow};
+
+    fn route() -> Route {
+        Route {
+            operator: "sunferry".to_string(),
+            id: "CECC".to_string(),
+            slug: Some("central_cheungchau".to_string()),
+            name: "Central - Cheung Chau".to_string(),
+            origin: "Central (Pier 5)".to_string(),
+            destination: "Cheung Chau".to_string(),
+        }
+    }
+
+    fn eta_report(sailings: Vec<Sailing>) -> EtaReport {
+        EtaReport {
+            operator: "sunferry".to_string(),
+            route: "Central - Cheung Chau".to_string(),
+            route_id: "CECC".to_string(),
+            direction: Some("outbound".to_string()),
+            generated_at: "2026-11-22 09:30".to_string(),
+            count: sailings.len(),
+            sailings,
+        }
+    }
+
+    #[test]
+    fn routes_table_lists_piers() {
+        let out = routes(&[route()]);
+        assert!(out.contains("sunferry"));
+        assert!(out.contains("Central - Cheung Chau"));
+        assert!(out.contains("Central (Pier 5) -> Cheung Chau"));
+    }
+
+    #[test]
+    fn eta_without_sailings_explains_the_gap() {
+        let out = eta(&eta_report(Vec::new()));
+        assert!(out.contains("CECC"));
+        assert!(out.contains("outbound"));
+        assert!(out.contains("No upcoming sailings"));
+        assert!(out.contains("check the timetable"));
+    }
+
+    #[test]
+    fn eta_renders_direction_vessel_and_remark() {
+        let out = eta(&eta_report(vec![Sailing {
+            depart: "10:30".to_string(),
+            eta: "10:35".to_string(),
+            eta_at: None,
+            direction: Some("outbound".to_string()),
+            vessel: Some("HKKF3".to_string()),
+            remark: Some("via Sok Kwu Wan".to_string()),
+        }]));
+        assert!(out.contains("10:30"));
+        assert!(out.contains("10:35"));
+        assert!(out.contains("HKKF3"));
+        assert!(out.contains("via Sok Kwu Wan"));
+    }
+
+    #[test]
+    fn timetable_without_rows_says_so() {
+        let report = TimetableReport {
+            operator: "hkkf".to_string(),
+            route: "Central - Yung Shue Wan".to_string(),
+            route_id: "2".to_string(),
+            direction: None,
+            count: 0,
+            rows: Vec::new(),
+        };
+        let out = timetable(&report);
+        assert!(out.contains("No timetable rows were published."));
+    }
+
+    #[test]
+    fn timetable_renders_markers_and_remarks() {
+        let report = TimetableReport {
+            operator: "hkkf".to_string(),
+            route: "Central - Yung Shue Wan".to_string(),
+            route_id: "2".to_string(),
+            direction: None,
+            count: 1,
+            rows: vec![TimetableRow {
+                service_day: "Sunday and Public Holidays".to_string(),
+                time: "00:30".to_string(),
+                marker: Some("^".to_string()),
+                remark: Some("Via Peng Chau".to_string()),
+            }],
+        };
+        let out = timetable(&report);
+        assert!(out.contains("Sunday and Public Holidays"));
+        assert!(out.contains("00:30"));
+        assert!(out.contains('^'));
+        assert!(out.contains("Via Peng Chau"));
+    }
+}

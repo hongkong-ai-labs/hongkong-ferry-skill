@@ -298,4 +298,132 @@ mod tests {
         assert_eq!(normalize_time("7:00 a.m.").as_deref(), Some("07:00"));
         assert_eq!(normalize_time("23:30").as_deref(), Some("23:30"));
     }
+
+    #[test]
+    fn parses_sun_timetable() {
+        let csv = "\u{feff}Direction,Service Date,Service Hour,Remark\r\n\
+                   Central to Cheung Chau,Mondays to Fridays except public holidays,12:30 a.m.,\r\n\
+                   Central to Cheung Chau,Mondays to Fridays except public holidays,6:10 a.m.,1\r\n";
+        let rows = crate::sources::sunferry::parse_sun_timetable(csv).unwrap();
+        assert_eq!(rows.len(), 2);
+        assert_eq!(rows[1].time, "06:10");
+        assert_eq!(rows[1].remark.as_deref(), Some("1"));
+    }
+
+    #[test]
+    fn parses_hkkf_timetable() {
+        let csv = "\u{feff}route id,direction,origin_en,a,b,c,dest_en,e,f,remarks,g,h,i\r\n\
+                   2,outbound,Central,a,b,c,Yung Shue Wan,d,e,note,g,\"['07:00', '*07:30', '^00:30']\",\"['08:00']\"\r\n";
+        let rows = crate::sources::hkkf::parse_hkkf_timetable(csv).unwrap();
+        assert_eq!(rows.len(), 4);
+        assert_eq!(rows[0].time, "07:00");
+        assert_eq!(rows[1].marker.as_deref(), Some("*"));
+        assert_eq!(rows[2].marker.as_deref(), Some("^"));
+    }
+
+    #[test]
+    fn operator_aliases_and_labels() {
+        for value in ["hkkf", "HK-KF", "islands"] {
+            assert_eq!(Operator::parse(value).unwrap(), Operator::Hkkf);
+            assert_eq!(Operator::parse(value).unwrap().label(), "hkkf");
+        }
+        for value in ["sunferry", "Sun-Ferry", "sf", "SUN"] {
+            assert_eq!(Operator::parse(value).unwrap(), Operator::SunFerry);
+            assert_eq!(Operator::parse(value).unwrap().label(), "sunferry");
+        }
+
+        let error = Operator::parse("star").unwrap_err().to_string();
+        assert!(error.contains("hkkf or sunferry"), "{error}");
+    }
+
+    #[test]
+    fn find_route_matches_id_slug_and_name() {
+        let routes = crate::sources::sunferry::sun_routes();
+
+        assert_eq!(find_route(&routes, "cecc").unwrap().id, "CECC");
+        assert_eq!(
+            find_route(&routes, "central_cheungchau").unwrap().id,
+            "CECC"
+        );
+        assert_eq!(find_route(&routes, "CHEUNG CHAU").unwrap().id, "CECC");
+        assert_eq!(find_route(&routes, "  npkc ").unwrap().id, "NPKC");
+        assert!(find_route(&routes, "macau").is_none());
+    }
+
+    #[test]
+    fn sun_registry_is_complete() {
+        let routes = crate::sources::sunferry::sun_routes();
+        assert_eq!(routes.len(), 4);
+        assert!(
+            routes
+                .iter()
+                .all(|route| route.operator == "sunferry" && route.slug.is_some())
+        );
+        for code in ["CECC", "CEMW", "NPHH", "NPKC"] {
+            assert!(find_route(&routes, code).is_some(), "missing {code}");
+        }
+    }
+
+    #[test]
+    fn rejects_unparseable_times() {
+        assert_eq!(normalize_time("25:00"), None);
+        assert_eq!(normalize_time("24:00"), None);
+        assert_eq!(normalize_time("7pm"), None);
+        assert_eq!(normalize_time("noon"), None);
+        assert_eq!(normalize_time(""), None);
+    }
+
+    #[test]
+    fn hkkf_timetable_skips_header_and_short_rows() {
+        let csv = "\u{feff}route id,direction,origin_en,a,b,c,dest_en,e,f,remarks,g,h,i\r\n\
+                   2,outbound,Central,a,b,c,Yung Shue Wan,d,e,note,g,,\r\n\
+                   2,outbound,Central,a,b,c,Yung Shue Wan,d,e,note,g\r\n";
+        let rows = crate::sources::hkkf::parse_hkkf_timetable(csv).unwrap();
+        assert!(rows.is_empty(), "{rows:?}");
+    }
+
+    #[test]
+    fn sun_timetable_skips_rows_without_a_time() {
+        let csv = "\u{feff}Direction,Service Date,Service Hour,Remark\r\n\
+                   Central to Cheung Chau,Mondays to Fridays except public holidays,,\r\n\
+                   Central to Cheung Chau,Saturdays,7:15 a.m.,\r\n";
+        let rows = crate::sources::sunferry::parse_sun_timetable(csv).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].time, "07:15");
+        assert_eq!(rows[0].service_day, "Saturdays");
+        assert_eq!(rows[0].remark, None);
+    }
+
+    #[test]
+    fn hkkf_eta_payload_deserializes() {
+        let payload: crate::sources::hkkf::HkkfEta = serde_json::from_str(
+            r#"{"generated_timestamp":"2026-11-22 09:30:00","data":[
+                {"direction":"outbound","session_time":"09:30","ETA":"09:35"},
+                {"direction":"inbound","session_time":"10:00","ETA":"10:00"}]}"#,
+        )
+        .unwrap();
+
+        assert_eq!(payload.generated_timestamp, "2026-11-22 09:30:00");
+        assert_eq!(payload.data.len(), 2);
+        assert_eq!(payload.data[0].session_time, "09:30");
+        assert_eq!(payload.data[0].eta, "09:35");
+        assert_eq!(payload.data[1].direction, "inbound");
+    }
+
+    #[test]
+    fn sun_eta_payload_deserializes_without_optional_fields() {
+        let payload: crate::sources::sunferry::SunEta = serde_json::from_str(
+            r#"{"generated_timestamp":null,"data":[
+                {"vesselcode":"","depart_time":"10:30","eta":"10:35","rmk_en":" "},
+                {"depart_time":null,"eta":null}]}"#,
+        )
+        .unwrap();
+
+        assert!(payload.generated_timestamp.is_none());
+        assert_eq!(payload.data.len(), 2);
+        assert_eq!(payload.data[0].depart_time.as_deref(), Some("10:30"));
+        assert_eq!(payload.data[0].vesselcode.as_deref(), Some(""));
+        assert!(payload.data[1].depart_time.is_none());
+        assert!(payload.data[1].eta.is_none());
+    }
 }

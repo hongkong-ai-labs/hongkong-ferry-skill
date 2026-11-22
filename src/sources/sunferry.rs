@@ -10,21 +10,21 @@ use crate::api::{
 const BASE: &str = "https://www.sunferry.com.hk/eta";
 
 #[derive(Debug, Deserialize)]
-struct SunEta {
+pub(crate) struct SunEta {
     #[serde(default)]
-    generated_timestamp: Option<String>,
+    pub(crate) generated_timestamp: Option<String>,
     #[serde(default)]
-    data: Vec<SunSailing>,
+    pub(crate) data: Vec<SunSailing>,
 }
 
 #[derive(Debug, Deserialize)]
-struct SunSailing {
+pub(crate) struct SunSailing {
     #[serde(default)]
-    vesselcode: Option<String>,
+    pub(crate) vesselcode: Option<String>,
     #[serde(default)]
-    depart_time: Option<String>,
+    pub(crate) depart_time: Option<String>,
     #[serde(default)]
-    eta: Option<String>,
+    pub(crate) eta: Option<String>,
     #[serde(default)]
     rmk_en: Option<String>,
 }
@@ -73,6 +73,16 @@ pub fn routes() -> Vec<Route> {
             destination: destination.to_string(),
         })
         .collect()
+}
+
+#[cfg(test)]
+pub(crate) fn parse_sun_timetable(body: &str) -> Result<Vec<TimetableRow>> {
+    parse_timetable(body)
+}
+
+#[cfg(test)]
+pub(crate) fn sun_routes() -> Vec<Route> {
+    routes()
 }
 
 pub async fn eta(client: &Client, route: &Route) -> Result<EtaReport> {
@@ -129,7 +139,7 @@ pub async fn timetable(
     })
 }
 
-fn parse_timetable(body: &str) -> Result<Vec<TimetableRow>> {
+pub(crate) fn parse_timetable(body: &str) -> Result<Vec<TimetableRow>> {
     let body = body.trim_start_matches('\u{feff}');
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(true)
